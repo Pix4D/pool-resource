@@ -1,0 +1,30 @@
+resource_types:
+- name: pool
+  type: docker-image
+  source:
+    repository: docker.internal:5000/concourse-pool-test
+    tag: latest
+    insecure_registries:
+      - docker.internal:5000
+    username: pix4d
+    password: ((docker_cloud_pix4d_password))
+
+resources:
+- name: foo.pool
+  type: pool
+  source:
+    uri: git@bitbucket.org:pix4d/concourse-locks-sandbox.git
+    branch: master
+    pool: sandbox
+    prometheus_push_gateway: http://prometheus.internal:9091
+    private_key: ((bitbucket_ssh_rw))
+
+jobs:
+- name: dummy
+  plan:
+  - put: foo.pool
+    params:
+      acquire: true
+  - put: foo.pool
+    params:
+      release: foo.pool

@@ -66,6 +66,7 @@ func (lp *LockPool) ClaimLock(lock string) (Version, error) {
 
 		return false, nil
 	})
+
 	fmt.Fprintf(lp.Output, "\nclaimed!\n")
 
 	return Version{
