@@ -2,12 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/concourse/pool-resource/out"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 )
 
 func main() {
@@ -40,66 +44,84 @@ func main() {
 		request.Source.RetryDelay = 10 * time.Second
 	}
 
+	var (
+		executionTime  prometheus.Histogram
+		executionTimer *prometheus.Timer
+	)
+
+	if request.Source.PrometheusPushGateway != "" {
+		fmt.Fprintf(os.Stderr, "Setting up prometheus client, pushgateway=%s\n",
+			request.Source.PrometheusPushGateway)
+		executionTime = prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name: "resource_pool_execution_time",
+			Help: "Execution time of the current operation",
+		})
+		executionTimer = prometheus.NewTimer(executionTime)
+	} else {
+		fmt.Fprintln(os.Stderr, "No prometheus pushgateway set. Will not emit any metrics.")
+	}
+
 	lockPool := out.NewLockPool(request.Source, os.Stderr)
 
 	var (
-		lock    string
-		version out.Version
+		lock          string
+		version       out.Version
+		operationName string
 	)
 
+	// TODO bad design: should never support multiple operations in a single run
+	// ... or alternatively, these should be passed as a list instead of a dict
 	if request.Params.Acquire {
+		operationName = "acquire_lock"
 		lock, version, err = lockPool.AcquireLock()
 		if err != nil {
 			fatal("acquiring lock", err)
 		}
-	}
-
-	if request.Params.Release != "" {
+	} else if request.Params.Release != "" {
+		operationName = "release_lock"
 		poolName := filepath.Join(sourceDir, request.Params.Release)
 		lock, version, err = lockPool.ReleaseLock(poolName)
 		if err != nil {
 			fatal("releasing lock", err)
 		}
-	}
-
-	if request.Params.Add != "" {
+	} else if request.Params.Add != "" {
+		operationName = "add_unclaimed_lock"
 		lockPath := filepath.Join(sourceDir, request.Params.Add)
 		lock, version, err = lockPool.AddUnclaimedLock(lockPath)
 		if err != nil {
 			fatal("adding lock", err)
 		}
-	}
-
-	if request.Params.AddClaimed != "" {
+	} else if request.Params.AddClaimed != "" {
+		operationName = "add_claimed_lock"
 		lockPath := filepath.Join(sourceDir, request.Params.AddClaimed)
 		lock, version, err = lockPool.AddClaimedLock(lockPath)
 		if err != nil {
 			fatal("adding pre-claimed lock", err)
 		}
-	}
-
-	if request.Params.Remove != "" {
+	} else if request.Params.Remove != "" {
+		operationName = "remove_lock"
 		removePath := filepath.Join(sourceDir, request.Params.Remove)
 		lock, version, err = lockPool.RemoveLock(removePath)
 		if err != nil {
 			fatal("removing lock", err)
 		}
-	}
-
-	if request.Params.Claim != "" {
+	} else if request.Params.Claim != "" {
+		operationName = "claim_lock"
 		lock = request.Params.Claim
 		version, err = lockPool.ClaimLock(lock)
 		if err != nil {
 			fatal("claiming lock", err)
 		}
-	}
-
-	if request.Params.Update != "" {
+	} else if request.Params.Update != "" {
+		operationName = "update_lock"
 		lockPath := filepath.Join(sourceDir, request.Params.Update)
 		lock, version, err = lockPool.UpdateLock(lockPath)
 		if err != nil {
 			fatal("updating lock", err)
 		}
+	} else {
+		println("NOOP execution is not supported. Please ask me to do something.")
+		os.Exit(1)
 	}
 
 	err = json.NewEncoder(os.Stdout).Encode(out.OutResponse{
@@ -109,6 +131,21 @@ func main() {
 			{Name: "pool_name", Value: request.Source.Pool},
 		},
 	})
+
+	if request.Source.PrometheusPushGateway != "" {
+		executionTimer.ObserveDuration()
+
+		fmt.Fprintln(os.Stderr, "Pushing prometheus metrics...")
+		err = push.New(request.Source.PrometheusPushGateway, "concourse_resource_pool").
+			Collector(executionTime).
+			Grouping("pool", request.Source.Pool).
+			Grouping("branch", request.Source.Branch). // git branch of the locks repo. Useful to filter out test runs
+			Grouping("operation", operationName).
+			Push()
+		if err != nil {
+			fatal("pushing metrics", err)
+		}
+	}
 
 	if err != nil {
 		fatal("encoding output", err)

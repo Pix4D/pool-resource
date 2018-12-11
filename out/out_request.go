@@ -14,11 +14,12 @@ type OutRequest struct {
 }
 
 type Source struct {
-	URI        string        `json:"uri"`
-	Branch     string        `json:"branch"`
-	PrivateKey string        `json:"private_key" mapstructure:"private_key"`
-	Pool       string        `json:"pool"`
-	RetryDelay time.Duration `json:"retry_delay" mapstructure:"retry_delay"`
+	URI                   string        `json:"uri"`
+	Branch                string        `json:"branch"`
+	PrivateKey            string        `json:"private_key" mapstructure:"private_key"`
+	Pool                  string        `json:"pool"`
+	PrometheusPushGateway string        `json:"prometheus_push_gateway" mapstructure:"prometheus_push_gateway"`
+	RetryDelay            time.Duration `json:"retry_delay" mapstructure:"retry_delay"`
 }
 
 func (s *Source) UnmarshalJSON(b []byte) error {
