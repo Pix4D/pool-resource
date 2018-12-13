@@ -209,9 +209,9 @@ of the same pool), you would put that name instead. For example:
 
 ### Prerequisites
 
-* golang is *required* - version 1.9.x is tested; earlier versions may also
+* golang is *required* - version 1.10.x is tested; earlier versions may also
   work.
-* docker is *required* - version 17.06.x is tested; earlier versions may also
+* docker is *required* - version 18.03.x is tested; earlier versions may also
   work.
 
 ### Running the tests
