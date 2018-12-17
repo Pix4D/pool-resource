@@ -1,6 +1,10 @@
-FROM golang:alpine as builder
+FROM golang:1.10-alpine as builder
+RUN apk add git
 COPY . /go/src/github.com/concourse/pool-resource
+WORKDIR /go/src/github.com/concourse/pool-resource
 ENV CGO_ENABLED 0
+RUN go get github.com/tools/godep
+RUN godep restore
 RUN go build -o /assets/out github.com/concourse/pool-resource/cmd/out
 RUN set -e; for pkg in $(go list ./...); do \
   go test -o "/tests/$(basename $pkg).test" -c $pkg; \
