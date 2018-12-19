@@ -28,6 +28,11 @@ func NewLockPool(source Source, output io.Writer) LockPool {
 	return lockPool
 }
 
+type Stats struct {
+	Claimed   int
+	Unclaimed int
+}
+
 //go:generate counterfeiter . LockHandler
 
 type LockHandler interface {
@@ -41,6 +46,8 @@ type LockHandler interface {
 	Setup() error
 	BroadcastLockPool() ([]byte, error)
 	ResetLock() error
+
+	GetStats() (*Stats, error)
 }
 
 func (lp *LockPool) ClaimLock(lock string) (Version, error) {

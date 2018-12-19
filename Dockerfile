@@ -4,7 +4,9 @@ COPY . /go/src/github.com/concourse/pool-resource
 WORKDIR /go/src/github.com/concourse/pool-resource
 ENV CGO_ENABLED 0
 RUN go get github.com/tools/godep
+RUN go get github.com/maxbrunsfeld/counterfeiter
 RUN godep restore
+RUN go generate ./...
 RUN go build -o /assets/out github.com/concourse/pool-resource/cmd/out
 RUN set -e; for pkg in $(go list ./...); do \
   go test -o "/tests/$(basename $pkg).test" -c $pkg; \

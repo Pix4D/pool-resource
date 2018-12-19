@@ -218,6 +218,36 @@ func (glh *GitLockHandler) Setup() error {
 	return nil
 }
 
+func (glh *GitLockHandler) countLockFiles(lockDirectory string) (int, error) {
+	count := 0
+	allFiles, err := ioutil.ReadDir(filepath.Join(glh.dir, glh.Source.Pool, lockDirectory))
+	if err != nil {
+		return -1, err
+	}
+	for _, file := range allFiles {
+		fileName := filepath.Base(file.Name())
+		if !strings.HasPrefix(fileName, ".") {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (glh *GitLockHandler) GetStats() (*Stats, error) {
+	stats := new(Stats)
+	var err error
+
+	stats.Claimed, err = glh.countLockFiles("claimed")
+	if err != nil {
+		return nil, err
+	}
+	stats.Unclaimed, err = glh.countLockFiles("unclaimed")
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
 func (glh *GitLockHandler) GrabAvailableLock() (string, string, error) {
 	var files []os.FileInfo
 
