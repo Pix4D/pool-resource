@@ -12,7 +12,7 @@ import (
 	"github.com/onsi/gomega/gbytes"
 
 	"github.com/concourse/pool-resource/out"
-	fakes "github.com/concourse/pool-resource/out/fakes"
+	fakes "github.com/concourse/pool-resource/out/outfakes"
 )
 
 var _ = Describe("Lock Pool", func() {
@@ -790,7 +790,7 @@ var _ = Describe("Lock Pool", func() {
 					})
 				})
 
-				Context( "when resetting the lock succeeds", func() {
+				Context("when resetting the lock succeeds", func() {
 					It("tries to update the lock it found in the name file", func() {
 						_, _, err := lockPool.UpdateLock(lockDir)
 						Ω(err).ShouldNot(HaveOccurred())

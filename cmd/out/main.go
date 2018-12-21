@@ -45,9 +45,15 @@ func main() {
 	}
 
 	var (
-		executionTime  prometheus.Histogram
-		executionTimer *prometheus.Timer
+		executionTime     prometheus.Histogram
+		executionTimer    *prometheus.Timer
+		numAvailableLocks prometheus.Gauge
+		numClaimedLocks   prometheus.Gauge
+
+		stats *out.Stats
 	)
+
+	lockPool := out.NewLockPool(request.Source, os.Stderr)
 
 	if request.Source.PrometheusPushGateway != "" {
 		fmt.Fprintf(os.Stderr, "Setting up prometheus client, pushgateway=%s\n",
@@ -57,11 +63,17 @@ func main() {
 			Help: "Execution time of the current operation",
 		})
 		executionTimer = prometheus.NewTimer(executionTime)
+		numAvailableLocks = prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "resource_pool_num_available_locks",
+			Help: "The number of unclaimed locks in the current pool",
+		})
+		numClaimedLocks = prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "resource_pool_num_claimed_locks",
+			Help: "The number of claimed locks in the current pool",
+		})
 	} else {
 		fmt.Fprintln(os.Stderr, "No prometheus pushgateway set. Will not emit any metrics.")
 	}
-
-	lockPool := out.NewLockPool(request.Source, os.Stderr)
 
 	var (
 		lock          string
@@ -129,8 +141,23 @@ func main() {
 		},
 	})
 
+	if err != nil {
+		fatal("encoding output", err)
+	}
+
 	if request.Source.PrometheusPushGateway != "" {
 		executionTimer.ObserveDuration()
+
+		err = lockPool.LockHandler.Setup()
+		if err != nil {
+			fatal("resetting up the git repository", err)
+		}
+		stats, err = lockPool.LockHandler.GetStats()
+		if err != nil {
+			fatal("getting lock handler stats", err)
+		}
+		numAvailableLocks.Set(float64(stats.Unclaimed))
+		numClaimedLocks.Set(float64(stats.Claimed))
 
 		fmt.Fprintln(os.Stderr, "Pushing prometheus metrics...")
 		err = push.New(request.Source.PrometheusPushGateway, "concourse_resource_pool").
@@ -142,10 +169,16 @@ func main() {
 		if err != nil {
 			fatal("pushing metrics", err)
 		}
-	}
 
-	if err != nil {
-		fatal("encoding output", err)
+		err = push.New(request.Source.PrometheusPushGateway, "concourse_resource_pool").
+			Collector(numAvailableLocks).
+			Collector(numClaimedLocks).
+			Grouping("pool", request.Source.Pool).
+			Grouping("branch", request.Source.Branch). // git branch of the locks repo. Useful to filter out test runs
+			Push()
+		if err != nil {
+			fatal("pushing metrics", err)
+		}
 	}
 }
 

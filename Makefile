@@ -9,3 +9,7 @@ pipeline:
 
 run:
 	fly -t prod-developers tj -w -j test-resource-pool/dummy
+
+build-and-deploy:
+	docker build -t docker.ci.pix4d.com/concourse-pool .
+	docker push docker.ci.pix4d.com/concourse-pool
