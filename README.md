@@ -72,6 +72,29 @@ filed named `.gitkeep`. Finally, create individual locks by making an empty file
   retrying to acquire a lock or release a lock. The default is 10 seconds.
   Valid values: `60s`, `90m`, `1h`.
 
+* `prometheus_push_gateway`: *Optional.* URL to the prometheus push gateway that will
+  expose the following metrics for each execution of the `out` step:
+
+    * `resource_pool_execution_time`:
+      Total execution time of the current operation.
+      Labels: `pool, branch, operation`
+
+    * `resource_pool_num_available_locks`:
+      Number of available/unclaimed locks in the current pool.
+      Labels: `pool, branch`
+
+    * `resource_pool_num_claimed_locks`:
+      Number of claimed locks in the current pool.
+      Labels: `pool, branch`
+    
+    > Notes:
+    All metrics are computed after performing the operation.
+    There is no `uri` label, because prometheus cannot (yet) handle slashes (`/`)
+    or many other common characters present in a git URI. Instead, you may consider
+    relying on either unique `pool` names, and/or `branch` names depending on the context.
+    For example, you could restrict `branch: master` for production and `branch: stage` for
+    smoke tests.
+
 
 ## Behavior
 
@@ -141,6 +164,10 @@ One of the following is required.
   The value is the path to a directory containing the files `name` and
   `metadata` which should contain the name of your new lock and the contents you
   would like in the lock, respectively.
+
+> Note: all `out` operations described above will emit a git commit.
+This fork of the original concourse pool resource also describes, in the git commit
+message, the concourse team name that ran the `out` step.
 
 ## Example Concourse Configuration
 
@@ -213,6 +240,8 @@ of the same pool), you would put that name instead. For example:
   work.
 * docker is *required* - version 18.03.x is tested; earlier versions may also
   work.
+* godep, for syncing dependencies
+* counterfeiter, for fakes
 
 ### Running the tests
 
