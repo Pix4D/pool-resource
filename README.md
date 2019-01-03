@@ -241,7 +241,7 @@ of the same pool), you would put that name instead. For example:
 * docker is *required* - version 18.03.x is tested; earlier versions may also
   work.
 * godep, for syncing dependencies
-* counterfeiter, for fakes
+ * counterfeiter, for generating test-doubles.
 
 ### Running the tests
 
