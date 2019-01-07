@@ -8,6 +8,15 @@ be interacted with in a serial manner.
 This resource is backed by a Git repository, so the configuration is largely the
 same as the git-resource.
 
+## Additional features compared to the upstream pool resource
+
+This fork provides the following additional features:
+
+1. The commit message on each lock operation contains the team name. This enables the smart reaping of stale locks in concert with the [Pool Boy] script.
+2. The resource is instrumented to report metrics to a [Prometheus] [Pushgateway]. This allows to gather important information such as queue length (number of jobs waiting on a lock). Usage is explained in this document.
+
+![Example Grafana display](grafana-resource-pool.png)
+
 ## Git Repository Structure
 
 ```
@@ -54,7 +63,7 @@ filed named `.gitkeep`. Finally, create individual locks by making an empty file
 
 * `private_key`: *Optional.* Private key to use when pulling/pushing. Ensure it does not require a password.
     Example:
-    ```
+    ```YAML
     private_key: |
       -----BEGIN RSA PRIVATE KEY-----
       MIIEowIBAAKCAQEAtCS10/f7W7lkQaSgD/mVeaSOvSF9ql4hf/zfMwfVGgHWjj+W
@@ -70,31 +79,28 @@ filed named `.gitkeep`. Finally, create individual locks by making an empty file
 
 * `retry_delay`: *Optional.* If specified, dictates how long to wait until
   retrying to acquire a lock or release a lock. The default is 10 seconds.
-  Valid values: `60s`, `90m`, `1h`.
+  Example of valid values: `60s`, `90m`, `1h`.
 
-* `prometheus_push_gateway`: *Optional.* URL to the prometheus push gateway that will
+* `prometheus_push_gateway`: *Optional.* URL to the [Prometheus] push gateway that will
   expose the following metrics for each execution of the `out` step:
 
-    * `resource_pool_execution_time`:
-      Total execution time of the current operation.
-      Labels: `pool, branch, operation`
-
-    * `resource_pool_num_available_locks`:
-      Number of available/unclaimed locks in the current pool.
-      Labels: `pool, branch`
-
-    * `resource_pool_num_claimed_locks`:
-      Number of claimed locks in the current pool.
-      Labels: `pool, branch`
-    
-    > Notes:
-    All metrics are computed after performing the operation.
-    There is no `uri` label, because prometheus cannot (yet) handle slashes (`/`)
-    or many other common characters present in a git URI. Instead, you may consider
-    relying on either unique `pool` names, and/or `branch` names depending on the context.
-    For example, you could restrict `branch: master` for production and `branch: stage` for
-    smoke tests.
-
+  * `resource_pool_execution_time`:
+    Total execution time of the current lock operation.
+    Labels: `pool, branch, operation`
+  * `resource_pool_num_available_locks`:
+    Number of available/unclaimed locks in the current pool.
+    Labels: `pool, branch`
+  * `resource_pool_num_claimed_locks`:
+    Number of claimed locks in the current pool.
+    Labels: `pool, branch`
+  
+  > Note:
+  All metrics are computed after performing the lock operation (acquire, release, etc).
+  There is no `uri` label, because [Prometheus] cannot handle slashes (`/`)
+  or many other common characters present in a git URI. Instead, you may consider
+  relying on either unique `pool` names, and/or `branch` names depending on the context.
+  For example, you could restrict `branch: master` for production and `branch: stage` for
+  smoke tests.
 
 ## Behavior
 
@@ -165,8 +171,8 @@ One of the following is required.
   `metadata` which should contain the name of your new lock and the contents you
   would like in the lock, respectively.
 
-> Note: all `out` operations described above will emit a git commit.
-This fork of the original concourse pool resource also describes, in the git commit
+> Note: all `out` operations described above will generate a git commit.
+This fork of the original Concourse pool resource also describes, in the git commit
 message, the concourse team name that ran the `out` step.
 
 ## Example Concourse Configuration
@@ -260,3 +266,7 @@ docker build -t pool-resource .
 
 Please make all pull requests to the `master` branch and ensure tests pass
 locally.
+
+[Pool Boy]: https://github.com/Pix4D/concourse-pool-boy
+[Prometheus]: https://prometheus.io/
+[Pushgateway]: https://github.com/prometheus/pushgateway
